@@ -239,6 +239,7 @@ impl Ui for Vec<u32> {
     }
 }
 
+#[derive(PartialEq)]
 enum VirtualScreen {
     Main,
     Options,
@@ -261,23 +262,41 @@ fn main() {
     // Limit to max ~60 fps update rate
     window.set_target_fps(60);
 
+    // buttons (TODO: Use button data struct to pass to draw_button)
     let options_button_area = Dimensions::new(0, 0, WIDTH/10, HEIGHT/10);
-
     let exit_button_area = Dimensions::new(WIDTH-(WIDTH/10), 0, WIDTH, HEIGHT/10);
 
     let mut which_screen = VirtualScreen::Main;
 
 
+    let mut left_mouse_down = false;
+    let mut lmd_previous = false;
+
+    let mut middle_mouse_down = false;
+    let mut mmd_previous = false;
+
+    let mut right_mouse_down = false;
+    let mut rmd_previous = false;
+
+    let mut previous_state = 0;
+    let mut state = 0;
+
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        let state = (start.elapsed().unwrap().as_millis() / 90 % 255);
-        println!("state = {}", state);
+        previous_state = state;
+        state = (start.elapsed().unwrap().as_millis() / 90 % 255);
+        if state != previous_state {
+            println!("state = {}", state);
+        }
         for i in buffer.iter_mut() {
             *i = Color::new(255, 0,0,0).into(); // write something more funny here!
         }
 
         let options_button_color: Color = Color::new(0,255,255,0);
         let exit_button_color: Color = Color::new((state % 255) as u8,255,0,0);
-        buffer.draw_button(&options_button_area, options_button_color.clone(), WIDTH, HEIGHT);
+        if which_screen == VirtualScreen::Main {
+            buffer.draw_button(&options_button_area, options_button_color.clone(), WIDTH, HEIGHT);
+        }
+
         buffer.draw_button(&exit_button_area, exit_button_color.clone(), WIDTH, HEIGHT);
 
         //let test_color: Color = 4294901760u32.into();
@@ -285,8 +304,17 @@ fn main() {
 
 
         if window.get_mouse_down(MouseButton::Left) {
+            left_mouse_down = true;
+            lmd_previous = true;
+        } else {
+            left_mouse_down = false;
+        }
+        if lmd_previous && !left_mouse_down {
+            // mouse up detected, reset boolean
+            lmd_previous = false;
             // discard any mouse clicks outside of window
             if let Some(pos) = window.get_mouse_pos(MouseMode::Discard) {
+                // rounds position to nearest integer
                 let (mx, my) = ((pos.0 + 0.5) as usize, (pos.1 + 0.5) as usize);
 
                 use VirtualScreen::*;
@@ -298,9 +326,14 @@ fn main() {
                         if exit_button_area.contains([mx, my]) {
                             break;
                         }
+                        if options_button_area.contains([mx, my]) {
+                            println!("Entering options menu");
+                            which_screen = Options;
+                        }
                     },
                     Options => {
                         if exit_button_area.contains([mx, my]) {
+                            println!("Exiting options menu");
                             which_screen = Main;
                         }
                     }
